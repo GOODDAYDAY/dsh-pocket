@@ -220,7 +220,7 @@ function PocketSettingsTab({ rpcCall, t }) {
     }
   };
 
-  // 自定义访问密码（issue #33）：公网/局域网各自设固定 8 位数字；自定义后公网不再自动轮换。
+  // 自定义访问密码（issue #33）：公网/局域网各自设固定密码（>6 位且 <128 位，任意字符）；自定义后公网不再自动轮换。
   // customPin: { which: 'public'|'lan', value, err } | null —— 正在输入自定义密码的区块
   const [customPin, setCustomPin] = useState(null);
   const saveCustomPin = async (which) => {
@@ -242,13 +242,12 @@ function PocketSettingsTab({ rpcCall, t }) {
   const customPinRow = (which) => h('div', { style: { marginTop: 6, fontSize: 12, color: 'var(--dsw-alias-label-secondary,#6b7280)', lineHeight: 1.5 } },
     t('customizing'),
     h('input', {
-      style: { width: 110, margin: '0 6px', padding: '4px 8px', fontSize: 14, letterSpacing: 2, textAlign: 'center', border: '1px solid var(--dsw-alias-border-l2,#d1d5db)', borderRadius: 6, outline: 'none' },
+      style: { width: 150, margin: '0 6px', padding: '4px 8px', fontSize: 14, letterSpacing: 1, textAlign: 'center', border: '1px solid var(--dsw-alias-border-l2,#d1d5db)', borderRadius: 6, outline: 'none' },
       type: 'password',
-      inputMode: 'numeric',
-      maxLength: 8,
+      maxLength: 127,
       value: customPin?.value ?? '',
       autoFocus: true,
-      onChange: (e) => setCustomPin((c) => ({ ...c, value: e.target.value.replace(/\D/g, ''), err: null })),
+      onChange: (e) => setCustomPin((c) => ({ ...c, value: e.target.value, err: null })),
       onKeyDown: (e) => { if (e.key === 'Enter') saveCustomPin(which); if (e.key === 'Escape') setCustomPin(null); },
     }),
     h('button', { style: { ...styles.btn, height: 26, padding: '0 10px', fontSize: 12, marginLeft: 2 }, onClick: () => saveCustomPin(which) }, t('save')),
