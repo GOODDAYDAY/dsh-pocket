@@ -12,6 +12,9 @@ export const POCKET_ENDPOINTS = Object.freeze({
   lanAuthSetEnabled: 'lanAuth.setEnabled',
   lanSetOverride: 'lan.setOverride',
   pinSetCustom: 'pin.setCustom',
+  macWhitelistSetEnabled: 'macWhitelist.setEnabled',
+  macWhitelistSet: 'macWhitelist.set',
+  macWhitelistDiscover: 'macWhitelist.discover',
 });
 
 /** 语义化版本比较：a > b 返回正数，相等 0，a < b 负数（数字段 + 预发布后缀）。 */
@@ -62,5 +65,7 @@ export function redactStatus(s) {
     tunnelQr: s?.tunnelQr ?? null,
     tunnelState: s?.tunnelState ?? { phase: 'idle' },
     dshPort: s?.dshPort ?? null,
+    macWhitelistEnabled: s?.macWhitelistEnabled === true,
+    macWhitelist: Array.isArray(s?.macWhitelist) ? s.macWhitelist : [],
   };
 }

@@ -211,6 +211,52 @@ function PocketSettingsTab({ rpcCall, t }) {
     } catch { /* 忽略 */ }
   };
 
+  // 本机设备免密列表（MAC 白名单）：设备发现（连接记录 + ARP 表）→ 勾选 → 备注 → 加入。
+  // 列表内设备局域网访问免输密码；列表外照旧。公网设备（无 MAC）列出但不可加入。
+  const [devices, setDevices] = useState(null);        // 发现结果 [{ ip, mac, via }] | null（未发现）
+  const [discovering, setDiscovering] = useState(false);
+  const [checked, setChecked] = useState({});          // { [mac]: true } 勾选集
+  const [adding, setAdding] = useState(null);          // 备注面板：待加入设备 [{ ip, mac }] | null
+  const [addNotes, setAddNotes] = useState({});        // 备注面板：{ [mac]: 备注 }
+  const [wlNotes, setWlNotes] = useState({});          // 已添加列表：备注编辑态 { [mac]: 备注 }
+  const [macError, setMacError] = useState(null);
+  const macList = status?.macWhitelist ?? [];          // [{ mac, note }]
+  const isInList = (mac) => macList.some((e) => e.mac === mac);
+  const macCount = (obj) => Object.keys(obj ?? {}).filter((k) => obj[k]).length;
+
+  const setMacWhitelistOn = async (on) => {
+    try {
+      const r = await call(POCKET_ENDPOINTS.macWhitelistSetEnabled, { on });
+      setStatus((s) => ({ ...s, macWhitelistEnabled: r.macWhitelistEnabled }));
+    } catch (err) { setMacError(err.message); }
+  };
+  const discoverDevices = async () => {
+    setDiscovering(true); setMacError(null);
+    try {
+      const r = await call(POCKET_ENDPOINTS.macWhitelistDiscover, {});
+      setDevices(r.devices); setChecked({});
+    } catch (err) { setMacError(err.message); }
+    finally { setDiscovering(false); }
+  };
+  const saveMacList = async (entries) => {
+    try {
+      const r = await call(POCKET_ENDPOINTS.macWhitelistSet, { entries });
+      setStatus((s) => ({ ...s, macWhitelist: r.macWhitelist }));
+    } catch (err) { setMacError(err.message); }
+  };
+  const openAddPanel = () => {
+    const sel = (devices ?? []).filter((d) => checked[d.mac] && !isInList(d.mac));
+    if (!sel.length) return;
+    setAdding(sel); setAddNotes({});
+  };
+  const confirmAdd = () => {
+    const entries = adding.map((d) => ({ mac: d.mac, note: (addNotes[d.mac] ?? '').trim() }));
+    saveMacList([...macList, ...entries]);
+    setAdding(null); setChecked({}); setDevices(null);
+  };
+  const removeMac = (mac) => saveMacList(macList.filter((e) => e.mac !== mac));
+  const saveNote = (mac) => saveMacList(macList.map((e) => (e.mac === mac ? { mac, note: (wlNotes[mac] ?? '').trim() } : e)));
+
   // 局域网地址手动覆盖（Tailscale/VPN 等远程访问场景）：空值恢复自动选择
   const setLanAddress = async (ip) => {
     try {
@@ -360,6 +406,62 @@ function PocketSettingsTab({ rpcCall, t }) {
                 ))
             : h('div', { style: { marginTop: 6, fontSize: 12, color: 'var(--dsw-alias-state-warn-primary,#b45309)', lineHeight: 1.5 } },
               t('lanPinOff')),
+          // 本机设备免密（MAC 白名单）：发现设备 → 勾选 → 备注 → 加入；名单内免输密码
+          h('div', { style: { marginTop: 12, paddingTop: 10, borderTop: '1px solid var(--dsw-alias-border-l2,#e5e7eb)' } },
+            h('div', { style: { display: 'flex', alignItems: 'center', gap: 8 } },
+              h('span', { style: { fontSize: 12, color: 'var(--dsw-alias-label-secondary,#6b7280)' } }, t('macWhitelist')),
+              h('button', {
+                style: { ...styles.btn, height: 28, padding: '0 12px', fontSize: 12, fontWeight: status?.macWhitelistEnabled === true ? 600 : 400, background: status?.macWhitelistEnabled === true ? 'var(--dsw-alias-button-primary-fill, var(--dsw-alias-brand-primary,#4f6ef7))' : 'var(--dsw-alias-bg-layer-1,#fff)', color: status?.macWhitelistEnabled === true ? 'var(--dsw-alias-label-primary-foreground, #fff)' : 'var(--dsw-alias-label-primary,inherit)' },
+                onClick: () => setMacWhitelistOn(true),
+              }, t('on')),
+              h('button', {
+                style: { ...styles.btn, height: 28, padding: '0 12px', fontSize: 12, fontWeight: status?.macWhitelistEnabled === false ? 600 : 400, background: status?.macWhitelistEnabled === false ? 'var(--dsw-alias-state-error-primary,#dc2626)' : 'var(--dsw-alias-bg-layer-1,#fff)', color: status?.macWhitelistEnabled === false ? '#fff' : 'var(--dsw-alias-label-primary,inherit)' },
+                onClick: () => setMacWhitelistOn(false),
+              }, t('off')),
+            ),
+            h('div', { style: styles.muted, marginTop: 4 }, t('macWhitelistHint')),
+            status?.macWhitelistEnabled === true ? h('div', { style: { marginTop: 8 } },
+              h('button', { style: styles.btn, onClick: discoverDevices, disabled: discovering }, discovering ? t('discovering') : t('discoverDevices')),
+              devices ? h('div', { style: { marginTop: 8 } },
+                devices.length === 0
+                  ? h('div', { style: styles.muted }, t('devicesEmpty'))
+                  : h('div', { style: { border: '1px solid var(--dsw-alias-border-l2,#e5e7eb)', borderRadius: 8, padding: '8px 10px' } },
+                    devices.map((d) => h('label', { key: `${d.ip}-${d.mac}`, style: { display: 'flex', alignItems: 'center', gap: 8, padding: '3px 0', fontSize: 12, cursor: d.mac ? 'pointer' : 'default' } },
+                      h('input', { type: 'checkbox', checked: !!checked[d.mac], disabled: !d.mac || isInList(d.mac), onChange: (e) => setChecked((c) => ({ ...c, [d.mac]: e.target.checked })) }),
+                      h('code', { style: { fontFamily: 'ui-monospace,Menlo,monospace', fontSize: 12 } }, d.mac ?? '—'),
+                      h('span', { style: { color: 'var(--dsw-alias-label-secondary,#6b7280)' } }, d.ip),
+                      !d.mac
+                        ? h('span', { style: { color: 'var(--dsw-alias-label-tertiary,#8b93a1)' } }, t('publicNoMac'))
+                        : isInList(d.mac) ? h('span', { style: { color: 'var(--dsw-alias-label-tertiary,#8b93a1)' } }, t('alreadyInList')) : null,
+                    )),
+                    macCount(checked) > 0 ? h('button', { style: { ...styles.primary, marginTop: 8, height: 30, padding: '0 12px', fontSize: 12 }, onClick: openAddPanel }, fmt(t, 'addSelected', { n: macCount(checked) })) : null,
+                  ),
+              ) : null,
+              // 备注面板：给勾选的设备各记一个备注
+              adding ? h('div', { style: { marginTop: 8, border: '1px solid var(--dsw-alias-border-l2,#e5e7eb)', borderRadius: 8, padding: '8px 10px' } },
+                adding.map((d) => h('div', { key: d.mac, style: { display: 'flex', alignItems: 'center', gap: 8, padding: '3px 0', fontSize: 12 } },
+                  h('code', { style: { fontFamily: 'ui-monospace,Menlo,monospace', fontSize: 12 } }, d.mac),
+                  h('input', { style: { flex: 1, minWidth: 0, padding: '4px 8px', fontSize: 12, border: '1px solid var(--dsw-alias-border-l2,#d1d5db)', borderRadius: 6, outline: 'none' }, placeholder: t('notePlaceholder'), maxLength: 50, value: addNotes[d.mac] ?? '', onChange: (e) => setAddNotes((n) => ({ ...n, [d.mac]: e.target.value })) }),
+                )),
+                h('div', { style: { display: 'flex', gap: 8, marginTop: 8 } },
+                  h('button', { style: { ...styles.btn, flex: 1, height: 28, padding: '0 12px', fontSize: 12 }, onClick: () => setAdding(null) }, t('cancel')),
+                  h('button', { style: { ...styles.primary, flex: 1, height: 28, padding: '0 12px', fontSize: 12 }, onClick: confirmAdd }, t('confirmAdd')),
+                ),
+              ) : null,
+              // 已添加列表（备注可改、可移除）
+              h('div', { style: { marginTop: 10 } },
+                macList.length === 0
+                  ? h('div', { style: styles.muted }, t('whitelistEmpty'))
+                  : macList.map((e) => h('div', { key: e.mac, style: { display: 'flex', alignItems: 'center', gap: 6, padding: '3px 0', fontSize: 12 } },
+                    h('code', { style: { fontFamily: 'ui-monospace,Menlo,monospace', fontSize: 12 } }, e.mac),
+                    h('input', { style: { flex: 1, minWidth: 0, padding: '3px 8px', fontSize: 12, border: '1px solid var(--dsw-alias-border-l2,#d1d5db)', borderRadius: 6, outline: 'none' }, placeholder: t('notePlaceholder'), maxLength: 50, value: wlNotes[e.mac] ?? e.note, onChange: (ev) => setWlNotes((n) => ({ ...n, [e.mac]: ev.target.value })) }),
+                    h('button', { style: { ...styles.btn, height: 26, padding: '0 10px', fontSize: 12 }, onClick: () => saveNote(e.mac) }, t('save')),
+                    h('button', { style: { ...styles.btn, height: 26, padding: '0 10px', fontSize: 12 }, onClick: () => removeMac(e.mac) }, t('removeFromList')),
+                  )),
+              ),
+              macError ? h('div', { style: { color: 'var(--dsw-alias-state-error-primary,#dc2626)', fontSize: 12, marginTop: 6 } }, macError) : null,
+            ) : null,
+          ),
         )
         : h('div', { style: styles.muted }, t('lanStarting')),
     ),
