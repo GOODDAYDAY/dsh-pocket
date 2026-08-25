@@ -67,13 +67,17 @@ test('PIN 自定义标记（issue #33）：默认 false，设置/清除持久化
   assert.equal(pinCustom('lan'), false, '互不影响');
 }));
 
-test('setCustomPin / rotateAccessToken（issue #33）：8 位数字自定义 + 自定义后公网不轮换；非法输入抛错', () => withHome(async () => {
+test('setCustomPin / rotateAccessToken（issue #33）：自定义密码（>6 位且 <128 位，任意字符）+ 自定义后公网不轮换；非法输入抛错', () => withHome(async () => {
   const { setCustomPin, rotateAccessToken, getAccessToken } = await import('../lib/index.js');
   const { pinCustom } = await import('../lib/settings.mjs');
-  // 非法输入
-  assert.throws(() => setCustomPin('public', '123'), /8 位数字/, '太短拒绝');
-  assert.throws(() => setCustomPin('public', 'abcdefgh'), /8 位数字/, '非数字拒绝');
-  assert.throws(() => setCustomPin('other', '12345678'), /未知/, '未知类型拒绝');
+  // 非法输入：长度 ≤6 或 ≥128
+  assert.throws(() => setCustomPin('public', '123456'), /大于 6 位/, '6 位太短拒绝');
+  assert.throws(() => setCustomPin('public', 'x'.repeat(128)), /小于 128 位/, '128 位过长拒绝');
+  assert.throws(() => setCustomPin('other', 'Abc@1234'), /未知/, '未知类型拒绝');
+  // 合法自定义：任意字符（数字/大小写/特殊符号）均可
+  assert.equal(setCustomPin('public', '88886666'), '88886666', '纯数字自定义成功');
+  assert.equal(setCustomPin('public', 'Abc@1234!'), 'Abc@1234!', '大小写+特殊符号自定义成功');
+  assert.equal(setCustomPin('public', 'abcdefg'), 'abcdefg', '7 位纯字母自定义成功');
   // 合法自定义：公网
   assert.equal(setCustomPin('public', '88886666'), '88886666', '公网自定义成功');
   assert.equal(pinCustom('public'), true, '公网标记自定义');
