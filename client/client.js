@@ -51,7 +51,11 @@ var POCKET_ENDPOINTS = Object.freeze({
   lanTokenRefresh: "token.lanRefresh",
   lanAuthSetEnabled: "lanAuth.setEnabled",
   lanSetOverride: "lan.setOverride",
-  pinSetCustom: "pin.setCustom"
+  lanSetEnabled: "lan.setEnabled",
+  pinSetCustom: "pin.setCustom",
+  macWhitelistSetEnabled: "macWhitelist.setEnabled",
+  macWhitelistSet: "macWhitelist.set",
+  macWhitelistDiscover: "macWhitelist.discover"
 });
 function compareVersions(a, b) {
   const pa = String(a).replace(/^[vV]/, "").split(".");
@@ -94,7 +98,9 @@ function redactStatus(s) {
     tunnelUrl: s?.tunnelUrl ?? null,
     tunnelQr: s?.tunnelQr ?? null,
     tunnelState: s?.tunnelState ?? { phase: "idle" },
-    dshPort: s?.dshPort ?? null
+    dshPort: s?.dshPort ?? null,
+    macWhitelistEnabled: s?.macWhitelistEnabled === true,
+    macWhitelist: Array.isArray(s?.macWhitelist) ? s.macWhitelist : []
   };
 }
 
@@ -1364,6 +1370,13 @@ var zh2 = {
   "versionRange": "\u5F53\u524D v{cur} \u2192 \u6700\u65B0 v{latest}",
   "lanTitle": "\u{1F4F6} \u5C40\u57DF\u7F51\uFF08\u540C\u4E00 WiFi\uFF09",
   "lanHint": "\u624B\u673A\u8FDE\u63A5\u540C\u4E00 WiFi \u540E\u626B\u7801\u5373\u53EF\u6253\u5F00",
+  "lanAccess": "\u5C40\u57DF\u7F51\u8BBF\u95EE",
+  "lanDisabledHint": "\u{1F512} \u5C40\u57DF\u7F51\u8BBF\u95EE\u5DF2\u5173\u95ED\uFF1A\u624B\u673A\u626B\u7801/\u94FE\u63A5\u5747\u4E0D\u53EF\u7528\uFF08\u516C\u7F51\u4E0D\u53D7\u5F71\u54CD\uFF09\u3002\u70B9\u300C\u5F00\u300D\u6062\u590D\u3002",
+  "lanToggleTitleOff": "\u5173\u95ED\u5C40\u57DF\u7F51\u8BBF\u95EE",
+  "lanToggleBodyOff": "\u5173\u95ED\u540E\uFF0C\u540C\u4E00 WiFi \u4E0B\u7684\u624B\u673A\u5C06\u65E0\u6CD5\u626B\u7801\u8BBF\u95EE\uFF08\u5C40\u57DF\u7F51\u4E8C\u7EF4\u7801/\u94FE\u63A5\u7ACB\u5373\u5931\u6548\uFF09\u3002\u516C\u7F51\u8BBF\u95EE\u4E0D\u53D7\u5F71\u54CD\u3002\u786E\u5B9A\u5173\u95ED\uFF1F",
+  "lanToggleTitleOn": "\u5F00\u542F\u5C40\u57DF\u7F51\u8BBF\u95EE",
+  "lanToggleBodyOn": "\u5F00\u542F\u540E\uFF0C\u540C\u4E00 WiFi \u7684\u624B\u673A\u626B\u7801\u5373\u53EF\u8BBF\u95EE\uFF08\u9ED8\u8BA4\u9700\u8F93\u5165\u5C40\u57DF\u7F51\u5BC6\u7801\uFF09\u3002\u786E\u5B9A\u5F00\u542F\uFF1F",
+  "confirm": "\u786E\u5B9A",
   "lanAddress": "\u5C40\u57DF\u7F51\u5730\u5740",
   "lanAddressAuto": "\u81EA\u52A8\uFF08\u63A8\u8350\uFF09",
   "lanAddressHint": "\u9AD8\u7EA7\u9009\u9879\uFF1A\u4E00\u822C\u4E0D\u9700\u8981\u4FEE\u6539\uFF1B\u4F7F\u7528 Tailscale/VPN \u7B49\u8FDC\u7A0B\u8BBF\u95EE\u65F6\u53EF\u624B\u52A8\u9009\u62E9",
@@ -1397,7 +1410,20 @@ var zh2 = {
   "slowHint": " \u2014 \u6709\u70B9\u4E45\uFF1F\u68C0\u67E5\u662F\u5426\u5F00\u7740\u4EE3\u7406/VPN\uFF08Clash TUN \u7B49\uFF09",
   "error": "\u274C \u5F00\u542F\u5931\u8D25\uFF1A{detail}\uFF08\u53EF\u91CD\u8BD5\uFF1B\u82E5\u662F\u4EE3\u7406/VPN \u95EE\u9898\u89C1 README \u6392\u969C\uFF09",
   "unknownError": "\u672A\u77E5\u9519\u8BEF",
-  "feedback": "\u6709\u95EE\u9898\uFF1F\u6B22\u8FCE\u5230 GitHub Issues \u53CD\u9988 \u{1F64F}"
+  "feedback": "\u6709\u95EE\u9898\uFF1F\u6B22\u8FCE\u5230 GitHub Issues \u53CD\u9988 \u{1F64F}",
+  "macWhitelist": "\u672C\u673A\u8BBE\u5907\u514D\u5BC6",
+  "macWhitelistHint": "\u5217\u8868\u5185\u7684\u8BBE\u5907\u8BBF\u95EE\u514D\u8F93\u5BC6\u7801\uFF1B\u5217\u8868\u5916\u8BBE\u5907\u7167\u65E7\uFF08\u5F00\u5BC6\u7801\u8F93\u5BC6\u7801\uFF0C\u5173\u5BC6\u7801\u76F4\u8FDE\uFF09\u3002\u516C\u7F51\u8BBF\u95EE\u4E0D\u53D7\u5F71\u54CD",
+  "discoverDevices": "\u53D1\u73B0\u8BBE\u5907",
+  "discovering": "\u53D1\u73B0\u4E2D\u2026",
+  "devicesEmpty": "\u6682\u65E0\u53D1\u73B0\uFF08\u5217\u8868\u663E\u793A\u6700\u8FD1\u4E0E\u672C\u673A\u901A\u4FE1\u8FC7\u7684\u8BBE\u5907\uFF0C\u53EF\u7A0D\u540E\u91CD\u8BD5\uFF09",
+  "publicNoMac": "\u516C\u7F51\u8BBE\u5907\uFF0C\u65E0\u6CD5\u514D\u5BC6",
+  "addSelected": "\u52A0\u5165\u514D\u5BC6\u5217\u8868\uFF08{n}\uFF09",
+  "alreadyInList": "\u5DF2\u5728\u5217\u8868",
+  "notePlaceholder": "\u5907\u6CE8\uFF08\u5982\uFF1A\u5BA2\u5385\u7535\u89C6\uFF09",
+  "confirmAdd": "\u786E\u8BA4\u52A0\u5165",
+  "whitelistEmpty": "\u514D\u5BC6\u5217\u8868\u4E3A\u7A7A",
+  "removeFromList": "\u79FB\u9664",
+  "macWhitelistError": "\u274C \u64CD\u4F5C\u5931\u8D25\uFF1A{err}"
 };
 var en2 = {
   "section": "Phone access",
@@ -1426,6 +1452,13 @@ var en2 = {
   "versionRange": "Current v{cur} \u2192 latest v{latest}",
   "lanTitle": "\u{1F4F6} LAN (same Wi-Fi)",
   "lanHint": "Scan to open once your phone is on the same Wi-Fi",
+  "lanAccess": "LAN access",
+  "lanDisabledHint": '\u{1F512} LAN access is off \u2014 the QR code and link are unavailable (public access is unaffected). Tap "On" to restore.',
+  "lanToggleTitleOff": "Turn off LAN access",
+  "lanToggleBodyOff": "Once off, phones on the same Wi-Fi can no longer scan to connect (the LAN QR code and link stop working immediately). Public access is unaffected. Turn it off?",
+  "lanToggleTitleOn": "Turn on LAN access",
+  "lanToggleBodyOn": "Once on, phones on the same Wi-Fi can scan to connect (a LAN PIN is required by default). Turn it on?",
+  "confirm": "Confirm",
   "lanAddress": "LAN address",
   "lanAddressAuto": "Auto (recommended)",
   "lanAddressHint": "Advanced option: usually no change needed; select manually when accessing through Tailscale/VPN",
@@ -1459,7 +1492,20 @@ var en2 = {
   "slowHint": " \u2014 taking long? Check for a proxy/VPN (e.g., Clash TUN)",
   "error": "\u274C Failed to enable: {detail} (you can retry; for proxy/VPN issues see the README)",
   "unknownError": "unknown error",
-  "feedback": "\u{1F64F} Questions? Open an issue on GitHub"
+  "feedback": "\u{1F64F} Questions? Open an issue on GitHub",
+  "macWhitelist": "Trusted devices (no PIN)",
+  "macWhitelistHint": "Devices on this list skip the PIN. Everyone else follows the usual flow (PIN if enabled, direct if off). Public access is unaffected",
+  "discoverDevices": "Discover devices",
+  "discovering": "Discovering\u2026",
+  "devicesEmpty": "Nothing found yet (the list shows devices recently in contact with this computer \u2014 retry later)",
+  "publicNoMac": "Public device \u2014 can\u2019t be trusted",
+  "addSelected": "Add to trusted list ({n})",
+  "alreadyInList": "Already listed",
+  "notePlaceholder": "Note (e.g. living-room TV)",
+  "confirmAdd": "Confirm add",
+  "whitelistEmpty": "Trusted list is empty",
+  "removeFromList": "Remove",
+  "macWhitelistError": "\u274C Failed: {err}"
 };
 
 // client/index.jsx
@@ -1637,6 +1683,73 @@ function PocketSettingsTab({ rpcCall, t }) {
     } catch {
     }
   };
+  const [devices, setDevices] = (0, import_react2.useState)(null);
+  const [discovering, setDiscovering] = (0, import_react2.useState)(false);
+  const [checked, setChecked] = (0, import_react2.useState)({});
+  const [adding, setAdding] = (0, import_react2.useState)(null);
+  const [addNotes, setAddNotes] = (0, import_react2.useState)({});
+  const [wlNotes, setWlNotes] = (0, import_react2.useState)({});
+  const [macError, setMacError] = (0, import_react2.useState)(null);
+  const macList = status?.macWhitelist ?? [];
+  const isInList = (mac) => macList.some((e) => e.mac === mac);
+  const macCount = (obj) => Object.keys(obj ?? {}).filter((k) => obj[k]).length;
+  const setMacWhitelistOn = async (on) => {
+    try {
+      const r = await call(POCKET_ENDPOINTS.macWhitelistSetEnabled, { on });
+      setStatus((s) => ({ ...s, macWhitelistEnabled: r.macWhitelistEnabled }));
+    } catch (err) {
+      setMacError(err.message);
+    }
+  };
+  const discoverDevices = async () => {
+    setDiscovering(true);
+    setMacError(null);
+    try {
+      const r = await call(POCKET_ENDPOINTS.macWhitelistDiscover, {});
+      setDevices(r.devices);
+      setChecked({});
+    } catch (err) {
+      setMacError(err.message);
+    } finally {
+      setDiscovering(false);
+    }
+  };
+  const saveMacList = async (entries) => {
+    try {
+      const r = await call(POCKET_ENDPOINTS.macWhitelistSet, { entries });
+      setStatus((s) => ({ ...s, macWhitelist: r.macWhitelist }));
+    } catch (err) {
+      setMacError(err.message);
+    }
+  };
+  const openAddPanel = () => {
+    const sel = (devices ?? []).filter((d) => checked[d.mac] && !isInList(d.mac));
+    if (!sel.length) return;
+    setAdding(sel);
+    setAddNotes({});
+  };
+  const confirmAdd = () => {
+    const entries = adding.map((d) => ({ mac: d.mac, note: (addNotes[d.mac] ?? "").trim() }));
+    saveMacList([...macList, ...entries]);
+    setAdding(null);
+    setChecked({});
+    setDevices(null);
+  };
+  const removeMac = (mac) => saveMacList(macList.filter((e) => e.mac !== mac));
+  const saveNote = (mac) => saveMacList(macList.map((e) => e.mac === mac ? { mac, note: (wlNotes[mac] ?? "").trim() } : e));
+  const [lanToggleOpen, setLanToggleOpen] = (0, import_react2.useState)(null);
+  const requestLanToggle = (on) => setLanToggleOpen(on);
+  const confirmLanToggle = async () => {
+    const on = lanToggleOpen;
+    setLanToggleOpen(null);
+    if (on === null) return;
+    try {
+      const r = await call(POCKET_ENDPOINTS.lanSetEnabled, { on });
+      setStatus((s) => ({ ...s, lanEnabled: r.lanEnabled }));
+    } catch (err) {
+      setError(err.message);
+    }
+  };
   const setLanAddress = async (ip) => {
     try {
       setStatus(await call(POCKET_ENDPOINTS.lanSetOverride, { ip }));
@@ -1750,7 +1863,21 @@ function PocketSettingsTab({ rpcCall, t }) {
       "div",
       { style: styles.block },
       (0, import_react2.createElement)("div", { style: { fontWeight: 600, fontSize: 13 } }, t("lanTitle")),
-      lanUrl ? (0, import_react2.createElement)(
+      // 局域网访问总开关：关闭后扫码/链接直接失效（公网不受影响）
+      (0, import_react2.createElement)(
+        "div",
+        { style: { display: "flex", alignItems: "center", gap: 8, marginTop: 8 } },
+        (0, import_react2.createElement)("span", { style: { fontSize: 12, color: "var(--dsw-alias-label-secondary,#6b7280)" } }, t("lanAccess")),
+        (0, import_react2.createElement)("button", {
+          style: { ...styles.btn, height: 28, padding: "0 12px", fontSize: 12, fontWeight: status?.lanEnabled !== false ? 600 : 400, background: status?.lanEnabled !== false ? "var(--dsw-alias-button-primary-fill, var(--dsw-alias-brand-primary,#4f6ef7))" : "var(--dsw-alias-bg-layer-1,#fff)", color: status?.lanEnabled !== false ? "var(--dsw-alias-label-primary-foreground, #fff)" : "var(--dsw-alias-label-primary,inherit)" },
+          onClick: () => requestLanToggle(true)
+        }, t("on")),
+        (0, import_react2.createElement)("button", {
+          style: { ...styles.btn, height: 28, padding: "0 12px", fontSize: 12, fontWeight: status?.lanEnabled === false ? 600 : 400, background: status?.lanEnabled === false ? "var(--dsw-alias-state-error-primary,#dc2626)" : "var(--dsw-alias-bg-layer-1,#fff)", color: status?.lanEnabled === false ? "#fff" : "var(--dsw-alias-label-primary,inherit)" },
+          onClick: () => requestLanToggle(false)
+        }, t("off"))
+      ),
+      status?.lanEnabled === false ? (0, import_react2.createElement)("div", { style: { marginTop: 8, fontSize: 12, color: "var(--dsw-alias-state-warn-primary,#b45309)", lineHeight: 1.5 } }, t("lanDisabledHint")) : lanUrl ? (0, import_react2.createElement)(
         "div",
         null,
         (0, import_react2.createElement)("img", { src: status.lanQr, alt: "LAN QR", style: styles.qr }),
@@ -1796,6 +1923,78 @@ function PocketSettingsTab({ rpcCall, t }) {
           "div",
           { style: { marginTop: 6, fontSize: 12, color: "var(--dsw-alias-state-warn-primary,#b45309)", lineHeight: 1.5 } },
           t("lanPinOff")
+        ),
+        // 本机设备免密（MAC 白名单）：发现设备 → 勾选 → 备注 → 加入；名单内免输密码
+        (0, import_react2.createElement)(
+          "div",
+          { style: { marginTop: 12, paddingTop: 10, borderTop: "1px solid var(--dsw-alias-border-l2,#e5e7eb)" } },
+          (0, import_react2.createElement)(
+            "div",
+            { style: { display: "flex", alignItems: "center", gap: 8 } },
+            (0, import_react2.createElement)("span", { style: { fontSize: 12, color: "var(--dsw-alias-label-secondary,#6b7280)" } }, t("macWhitelist")),
+            (0, import_react2.createElement)("button", {
+              style: { ...styles.btn, height: 28, padding: "0 12px", fontSize: 12, fontWeight: status?.macWhitelistEnabled === true ? 600 : 400, background: status?.macWhitelistEnabled === true ? "var(--dsw-alias-button-primary-fill, var(--dsw-alias-brand-primary,#4f6ef7))" : "var(--dsw-alias-bg-layer-1,#fff)", color: status?.macWhitelistEnabled === true ? "var(--dsw-alias-label-primary-foreground, #fff)" : "var(--dsw-alias-label-primary,inherit)" },
+              onClick: () => setMacWhitelistOn(true)
+            }, t("on")),
+            (0, import_react2.createElement)("button", {
+              style: { ...styles.btn, height: 28, padding: "0 12px", fontSize: 12, fontWeight: status?.macWhitelistEnabled === false ? 600 : 400, background: status?.macWhitelistEnabled === false ? "var(--dsw-alias-state-error-primary,#dc2626)" : "var(--dsw-alias-bg-layer-1,#fff)", color: status?.macWhitelistEnabled === false ? "#fff" : "var(--dsw-alias-label-primary,inherit)" },
+              onClick: () => setMacWhitelistOn(false)
+            }, t("off"))
+          ),
+          (0, import_react2.createElement)("div", { style: styles.muted, marginTop: 4 }, t("macWhitelistHint")),
+          status?.macWhitelistEnabled === true ? (0, import_react2.createElement)(
+            "div",
+            { style: { marginTop: 8 } },
+            (0, import_react2.createElement)("button", { style: styles.btn, onClick: discoverDevices, disabled: discovering }, discovering ? t("discovering") : t("discoverDevices")),
+            devices ? (0, import_react2.createElement)(
+              "div",
+              { style: { marginTop: 8 } },
+              devices.length === 0 ? (0, import_react2.createElement)("div", { style: styles.muted }, t("devicesEmpty")) : (0, import_react2.createElement)(
+                "div",
+                { style: { border: "1px solid var(--dsw-alias-border-l2,#e5e7eb)", borderRadius: 8, padding: "8px 10px" } },
+                devices.map((d) => (0, import_react2.createElement)(
+                  "label",
+                  { key: `${d.ip}-${d.mac}`, style: { display: "flex", alignItems: "center", gap: 8, padding: "3px 0", fontSize: 12, cursor: d.mac ? "pointer" : "default" } },
+                  (0, import_react2.createElement)("input", { type: "checkbox", checked: !!checked[d.mac], disabled: !d.mac || isInList(d.mac), onChange: (e) => setChecked((c) => ({ ...c, [d.mac]: e.target.checked })) }),
+                  (0, import_react2.createElement)("code", { style: { fontFamily: "ui-monospace,Menlo,monospace", fontSize: 12 } }, d.mac ?? "\u2014"),
+                  (0, import_react2.createElement)("span", { style: { color: "var(--dsw-alias-label-secondary,#6b7280)" } }, d.ip),
+                  !d.mac ? (0, import_react2.createElement)("span", { style: { color: "var(--dsw-alias-label-tertiary,#8b93a1)" } }, t("publicNoMac")) : isInList(d.mac) ? (0, import_react2.createElement)("span", { style: { color: "var(--dsw-alias-label-tertiary,#8b93a1)" } }, t("alreadyInList")) : null
+                )),
+                macCount(checked) > 0 ? (0, import_react2.createElement)("button", { style: { ...styles.primary, marginTop: 8, height: 30, padding: "0 12px", fontSize: 12 }, onClick: openAddPanel }, fmt(t, "addSelected", { n: macCount(checked) })) : null
+              )
+            ) : null,
+            // 备注面板：给勾选的设备各记一个备注
+            adding ? (0, import_react2.createElement)(
+              "div",
+              { style: { marginTop: 8, border: "1px solid var(--dsw-alias-border-l2,#e5e7eb)", borderRadius: 8, padding: "8px 10px" } },
+              adding.map((d) => (0, import_react2.createElement)(
+                "div",
+                { key: d.mac, style: { display: "flex", alignItems: "center", gap: 8, padding: "3px 0", fontSize: 12 } },
+                (0, import_react2.createElement)("code", { style: { fontFamily: "ui-monospace,Menlo,monospace", fontSize: 12 } }, d.mac),
+                (0, import_react2.createElement)("input", { style: { flex: 1, minWidth: 0, padding: "4px 8px", fontSize: 12, border: "1px solid var(--dsw-alias-border-l2,#d1d5db)", borderRadius: 6, outline: "none" }, placeholder: t("notePlaceholder"), maxLength: 50, value: addNotes[d.mac] ?? "", onChange: (e) => setAddNotes((n) => ({ ...n, [d.mac]: e.target.value })) })
+              )),
+              (0, import_react2.createElement)(
+                "div",
+                { style: { display: "flex", gap: 8, marginTop: 8 } },
+                (0, import_react2.createElement)("button", { style: { ...styles.btn, flex: 1, height: 28, padding: "0 12px", fontSize: 12 }, onClick: () => setAdding(null) }, t("cancel")),
+                (0, import_react2.createElement)("button", { style: { ...styles.primary, flex: 1, height: 28, padding: "0 12px", fontSize: 12 }, onClick: confirmAdd }, t("confirmAdd"))
+              )
+            ) : null,
+            // 已添加列表（备注可改、可移除）
+            (0, import_react2.createElement)(
+              "div",
+              { style: { marginTop: 10 } },
+              macList.length === 0 ? (0, import_react2.createElement)("div", { style: styles.muted }, t("whitelistEmpty")) : macList.map((e) => (0, import_react2.createElement)(
+                "div",
+                { key: e.mac, style: { display: "flex", alignItems: "center", gap: 6, padding: "3px 0", fontSize: 12 } },
+                (0, import_react2.createElement)("code", { style: { fontFamily: "ui-monospace,Menlo,monospace", fontSize: 12 } }, e.mac),
+                (0, import_react2.createElement)("input", { style: { flex: 1, minWidth: 0, padding: "3px 8px", fontSize: 12, border: "1px solid var(--dsw-alias-border-l2,#d1d5db)", borderRadius: 6, outline: "none" }, placeholder: t("notePlaceholder"), maxLength: 50, value: wlNotes[e.mac] ?? e.note, onChange: (ev) => setWlNotes((n) => ({ ...n, [e.mac]: ev.target.value })) }),
+                (0, import_react2.createElement)("button", { style: { ...styles.btn, height: 26, padding: "0 10px", fontSize: 12 }, onClick: () => saveNote(e.mac) }, t("save")),
+                (0, import_react2.createElement)("button", { style: { ...styles.btn, height: 26, padding: "0 10px", fontSize: 12 }, onClick: () => removeMac(e.mac) }, t("removeFromList"))
+              ))
+            ),
+            macError ? (0, import_react2.createElement)("div", { style: { color: "var(--dsw-alias-state-error-primary,#dc2626)", fontSize: 12, marginTop: 6 } }, macError) : null
+          ) : null
         )
       ) : (0, import_react2.createElement)("div", { style: styles.muted }, t("lanStarting"))
     ),
@@ -1834,6 +2033,23 @@ function PocketSettingsTab({ rpcCall, t }) {
       )
     ),
     error ? (0, import_react2.createElement)("div", { style: { color: "var(--dsw-alias-state-error-primary,#dc2626)", fontSize: 12, marginTop: 8 } }, `\u274C ${error}`) : null,
+    // 局域网访问开关确认弹框（关闭/打开时弹窗提醒）
+    lanToggleOpen !== null ? (0, import_react2.createElement)(
+      "div",
+      { style: { position: "fixed", inset: 0, zIndex: 1e4, background: "rgba(0,0,0,.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 } },
+      (0, import_react2.createElement)(
+        "div",
+        { style: { background: "var(--dsw-alias-bg-layer-1,#fff)", borderRadius: 12, maxWidth: 420, width: "100%", padding: "20px 22px", boxShadow: "0 8px 32px rgba(0,0,0,.18)" } },
+        (0, import_react2.createElement)("div", { style: { fontWeight: 600, fontSize: 15, color: lanToggleOpen ? "var(--dsw-alias-brand-primary,#4f6ef7)" : "var(--dsw-alias-state-warn-primary,#b45309)", marginBottom: 10 } }, t(lanToggleOpen ? "lanToggleTitleOn" : "lanToggleTitleOff")),
+        (0, import_react2.createElement)("div", { style: { fontSize: 13, lineHeight: 1.7, color: "var(--dsw-alias-label-primary,inherit)" } }, t(lanToggleOpen ? "lanToggleBodyOn" : "lanToggleBodyOff")),
+        (0, import_react2.createElement)(
+          "div",
+          { style: { display: "flex", gap: 8, marginTop: 16 } },
+          (0, import_react2.createElement)("button", { style: { ...styles.btn, flex: 1 }, onClick: () => setLanToggleOpen(null) }, t("cancel")),
+          (0, import_react2.createElement)("button", { style: { ...styles.primary, flex: 1 }, onClick: confirmLanToggle }, t("confirm"))
+        )
+      )
+    ) : null,
     // 安全免责声明弹框（issue #31）：每次开启公网访问前确认
     disclaimerOpen ? (0, import_react2.createElement)(
       "div",
