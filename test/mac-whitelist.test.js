@@ -239,3 +239,45 @@ test('WS：白名单命中放行（101）；未命中回退 401', async () => {
     await new Promise((r) => denied.up.close(r));
   }
 });
+
+// 回归：index.js 的 RPC 接线曾漏 import setMacWhitelistEnabled / setMacWhitelist，
+// 点「Trusted devices」开关会在调用时抛 ReferenceError（module 加载不报错，单测难发现）。
+test('index.js RPC 接线：macWhitelist.setEnabled / macWhitelist.set 走 settings 持久化', () => withHome(async () => {
+  const { apply } = await import('../lib/index.js');
+  const { POCKET_RPC_CHANNEL, POCKET_ENDPOINTS } = await import('../client/api.js');
+
+  let handler = null;
+  const ctx = {
+    logger: () => ({ error() {}, info() {}, warn() {} }),
+    webServer: { port: 3080 },
+    on: () => () => {},
+    effect: () => {},
+    connection: {
+      rpc: {
+        handle: (channel, fn, opts) => {
+          assert.equal(channel, POCKET_RPC_CHANNEL);
+          handler = fn;
+          return () => { handler = null; };
+        },
+      },
+    },
+  };
+  const stubService = {
+    startProxy: async () => ({ port: 3081, getSeenClients: () => [] }),
+    dispose: async () => {},
+    status: async () => ({}),
+    startTunnel: async () => 'https://x.trycloudflare.com',
+    stopTunnel: () => {},
+  };
+
+  apply(ctx, {}, { service: stubService });
+  assert.ok(handler, 'RPC handler 已注册');
+
+  const on = await handler(POCKET_ENDPOINTS.macWhitelistSetEnabled, { on: true });
+  assert.equal(on.ok, true, '开启白名单开关不抛 ReferenceError');
+  assert.equal(on.value.macWhitelistEnabled, true, '开关已开启');
+
+  const set = await handler(POCKET_ENDPOINTS.macWhitelistSet, { entries: [{ mac: 'aa:bb:cc:dd:ee:ff', note: 'x' }] });
+  assert.equal(set.ok, true, '设置白名单不抛 ReferenceError');
+  assert.deepEqual(set.value.macWhitelist, [{ mac: 'aa:bb:cc:dd:ee:ff', note: 'x' }], '名单已保存');
+}));
